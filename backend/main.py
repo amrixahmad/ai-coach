@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 from pathlib import Path
@@ -14,6 +15,15 @@ load_dotenv()
 
 app = FastAPI()
 
+# Add CORS Middleware to allow Web requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -23,8 +33,16 @@ if GENAI_API_KEY:
     genai.configure(api_key=GENAI_API_KEY)
 
 # Initialize MediaPipe
-mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+mp_pose = None
+pose = None
+try:
+    if hasattr(mp, 'solutions'):
+        mp_pose = mp.solutions.pose
+        pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    else:
+        print("Warning: mediapipe.solutions not found. Pose tracking will be disabled.")
+except Exception as e:
+    print(f"Warning: Failed to initialize MediaPipe: {e}")
 
 @app.get("/")
 def read_root():
@@ -57,7 +75,7 @@ def analyze_video_with_gemini(video_path):
         raise ValueError(f"Video processing failed: {video_file.state.name}")
 
     print("\nGenerating analysis...")
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+    model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
     
     prompt = """
     Analyze this basketball video and output a JSON object with the following structure for each shot attempt:
@@ -98,6 +116,11 @@ def process_pose_tracking(video_path):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     tracking_data = []
+    
+    if pose is None:
+        cap.release()
+        return tracking_data, fps, width, height
+
     frame_count = 0
     
     # Process every 5th frame to speed up

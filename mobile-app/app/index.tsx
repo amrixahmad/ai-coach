@@ -8,10 +8,14 @@ import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { Platform } from 'react-native';
+
 // CHANGE THIS TO YOUR COMPUTER'S LOCAL IP ADDRESS if testing on real device
 // For Android Emulator, use 'http://10.0.2.2:8000'
-// For iOS Simulator, use 'http://localhost:8000'
-const BACKEND_URL = 'http://10.0.2.2:8000/process-video'; 
+// For iOS Simulator and Web, use 'http://localhost:8000'
+const BACKEND_URL = Platform.OS === 'android' 
+  ? 'http://10.0.2.2:8000/process-video'
+  : 'http://localhost:8000/process-video';
 
 export default function Home() {
   const [videoUri, setVideoUri] = useState<string | null>(null);
@@ -38,16 +42,39 @@ export default function Home() {
     
     try {
       console.log("Uploading to:", BACKEND_URL);
-      const response = await uploadAsync(BACKEND_URL, videoUri, {
-        fieldName: 'file',
-        httpMethod: 'POST',
-        uploadType: FileSystemUploadType.MULTIPART,
-      });
-
-      console.log("Response status:", response.status);
       
-      if (response.status === 200) {
-        const data = JSON.parse(response.body);
+      let responseStatus;
+      let responseBody;
+
+      if (Platform.OS === 'web') {
+        // Web Upload using Fetch
+        const videoRes = await fetch(videoUri);
+        const blob = await videoRes.blob();
+        const formData = new FormData();
+        formData.append('file', blob, 'upload.mp4');
+
+        const res = await fetch(BACKEND_URL, {
+          method: 'POST',
+          body: formData,
+        });
+
+        responseStatus = res.status;
+        responseBody = await res.text();
+      } else {
+        // Native Upload using Expo FileSystem
+        const res = await uploadAsync(BACKEND_URL, videoUri, {
+          fieldName: 'file',
+          httpMethod: 'POST',
+          uploadType: FileSystemUploadType.MULTIPART,
+        });
+        responseStatus = res.status;
+        responseBody = res.body;
+      }
+
+      console.log("Response status:", responseStatus);
+      
+      if (responseStatus === 200) {
+        const data = JSON.parse(responseBody);
         // Navigate to results page with data
         router.push({
           pathname: '/results',
@@ -59,8 +86,8 @@ export default function Home() {
           }
         });
       } else {
-        Alert.alert("Upload Failed", "Server returned status " + response.status);
-        console.error("Upload failed:", response.body);
+        Alert.alert("Upload Failed", "Server returned status " + responseStatus);
+        console.error("Upload failed:", responseBody);
       }
     } catch (error) {
       console.error("Error uploading video:", error);
