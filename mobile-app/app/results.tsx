@@ -19,8 +19,41 @@ export default function Results() {
   const [activeShotIndex, setActiveShotIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [containerLayout, setContainerLayout] = useState({ width: 0, height: 0 });
+  
+  // Initialize with metadata if available, otherwise default to 16:9
+  const [videoAspectRatio, setVideoAspectRatio] = useState(() => {
+    return (metadata?.width && metadata?.height) ? metadata.width / metadata.height : 16/9;
+  });
+  
+  const [availableWidth, setAvailableWidth] = useState(0);
 
   const shots = analysis?.shots || [];
+
+  const handleVideoLoad = (status: any) => {
+    if (status.isLoaded && status.naturalSize) {
+      const { width, height } = status.naturalSize;
+      setVideoAspectRatio(width / height);
+    }
+  };
+
+  // Calculate video dimensions based on available width and aspect ratio
+  const videoDimensions = useMemo(() => {
+    if (availableWidth === 0) return { width: '100%' as const, height: 300 };
+    
+    const maxHeight = 550;
+    let finalWidth = availableWidth;
+    let finalHeight = finalWidth / videoAspectRatio;
+    
+    if (finalHeight > maxHeight) {
+      finalHeight = maxHeight;
+      finalWidth = finalHeight * videoAspectRatio;
+    }
+    
+    return {
+      width: finalWidth,
+      height: finalHeight
+    };
+  }, [availableWidth, videoAspectRatio]);
 
   // Helper to find the closest tracking frame
   const currentTracking = useMemo(() => {
@@ -120,28 +153,35 @@ export default function Results() {
       </View>
 
       <View 
-        style={styles.videoContainer}
-        onLayout={(e) => setContainerLayout(e.nativeEvent.layout)}
+        style={{ width: '100%', alignItems: 'center' }}
+        onLayout={(e) => setAvailableWidth(e.nativeEvent.layout.width)}
       >
-        <Video
-          style={styles.video}
-          source={{ uri: videoUri }}
-          useNativeControls
-          resizeMode={ResizeMode.CONTAIN}
-          isLooping
-          onPlaybackStatusUpdate={(status) => {
-            if (status.isLoaded) {
-              setCurrentTime(status.positionMillis / 1000);
-            }
-          }}
-          progressUpdateIntervalMillis={50}
-        />
-        
-        {/* Overlay Layer */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Svg height="100%" width="100%">
-            {renderOverlay()}
-          </Svg>
+        <View 
+          style={[
+            styles.videoContainer,
+            videoDimensions
+          ]}
+          onLayout={(e) => setContainerLayout(e.nativeEvent.layout)}
+        >
+          <Video
+            style={styles.video}
+            source={{ uri: videoUri }}
+            useNativeControls
+            resizeMode={ResizeMode.CONTAIN}
+            isLooping
+            onLoad={handleVideoLoad}
+            onPlaybackStatusUpdate={(status) => {
+              if (status.isLoaded) {
+                setCurrentTime(status.positionMillis / 1000);
+              }
+            }}
+            progressUpdateIntervalMillis={50}
+          />
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Svg height="100%" width="100%">
+              {renderOverlay()}
+            </Svg>
+          </View>
         </View>
       </View>
 
@@ -202,9 +242,11 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   videoContainer: {
-    width: '100%',
-    height: 300,
     backgroundColor: 'black',
+    alignSelf: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 16,
   },
   video: {
     width: '100%',

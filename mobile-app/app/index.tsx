@@ -195,11 +195,12 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: '100%',
-    height: 400, // Fixed height for preview
+    maxHeight: 500, // Limit height for vertical videos
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'black',
     position: 'relative',
+    alignSelf: 'center', // Center it if it doesn't take full width
   },
   video: {
     width: '100%',
