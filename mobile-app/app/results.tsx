@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import Svg, { Polygon, Text as SvgText, Rect, G } from 'react-native-svg';
 
 export default function Results() {
   const params = useLocalSearchParams();
@@ -11,11 +12,101 @@ export default function Results() {
   
   // Parse the analysis data passed as a string
   const analysis = params.analysis ? JSON.parse(params.analysis as string) : null;
+  const tracking = params.tracking ? JSON.parse(params.tracking as string) : [];
+  const metadata = params.metadata ? JSON.parse(params.metadata as string) : { width: 1920, height: 1080 };
   const videoUri = params.videoUri as string;
   
   const [activeShotIndex, setActiveShotIndex] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [containerLayout, setContainerLayout] = useState({ width: 0, height: 0 });
 
   const shots = analysis?.shots || [];
+
+  // Helper to find the closest tracking frame
+  const currentTracking = useMemo(() => {
+    if (!tracking.length) return null;
+    // Simple closest match - could be optimized with binary search or interpolation
+    return tracking.reduce((prev: any, curr: any) => {
+      return (Math.abs(curr.timestamp - currentTime) < Math.abs(prev.timestamp - currentTime) ? curr : prev);
+    });
+  }, [currentTime, tracking]);
+
+  const renderOverlay = () => {
+    if (!currentTracking || !containerLayout.width || !metadata.width) return null;
+
+    // Calculate the actual video display area within the container (ResizeMode.CONTAIN logic)
+    const videoRatio = metadata.width / metadata.height;
+    const containerRatio = containerLayout.width / containerLayout.height;
+    
+    let displayWidth = containerLayout.width;
+    let displayHeight = containerLayout.height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (videoRatio > containerRatio) {
+      // Video is wider than container (fit width, black bars on top/bottom)
+      displayHeight = containerLayout.width / videoRatio;
+      offsetY = (containerLayout.height - displayHeight) / 2;
+    } else {
+      // Video is taller than container (fit height, black bars on left/right)
+      displayWidth = containerLayout.height * videoRatio;
+      offsetX = (containerLayout.width - displayWidth) / 2;
+    }
+
+    // Normalized coordinates (0-1) -> Screen coordinates
+    const headX = offsetX + (currentTracking.head_x * displayWidth);
+    const headY = offsetY + (currentTracking.head_y * displayHeight);
+
+    // Arrow dimensions
+    const arrowWidth = 20;
+    const arrowHeight = 20;
+    const offsetAboveHead = 60; // How far above the head to float
+
+    // Calculate arrow points (pointing DOWN)
+    // Tip is at (headX, headY - offset)
+    // Base is above that
+    const tipX = headX;
+    const tipY = headY - offsetAboveHead;
+    
+    const leftBaseX = headX - arrowWidth / 2;
+    const rightBaseX = headX + arrowWidth / 2;
+    const baseY = tipY - arrowHeight;
+
+    const points = `${tipX},${tipY} ${leftBaseX},${baseY} ${rightBaseX},${baseY}`;
+
+    return (
+      <G>
+        {/* Name Label */}
+        <Rect
+          x={headX - 40}
+          y={baseY - 35}
+          width="80"
+          height="30"
+          fill="black"
+          opacity="0.7"
+          rx="8"
+        />
+        <SvgText
+          x={headX}
+          y={baseY - 15}
+          fill="white"
+          fontSize="16"
+          fontWeight="bold"
+          textAnchor="middle"
+        >
+          PLAYER
+        </SvgText>
+
+        {/* Arrow */}
+        <Polygon
+          points={points}
+          fill="red"
+          stroke="white"
+          strokeWidth="2"
+        />
+      </G>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -28,15 +119,30 @@ export default function Results() {
         <Text style={styles.headerTitle}>Shot Analysis</Text>
       </View>
 
-      <View style={styles.videoContainer}>
+      <View 
+        style={styles.videoContainer}
+        onLayout={(e) => setContainerLayout(e.nativeEvent.layout)}
+      >
         <Video
           style={styles.video}
           source={{ uri: videoUri }}
           useNativeControls
           resizeMode={ResizeMode.CONTAIN}
           isLooping
+          onPlaybackStatusUpdate={(status) => {
+            if (status.isLoaded) {
+              setCurrentTime(status.positionMillis / 1000);
+            }
+          }}
+          progressUpdateIntervalMillis={50}
         />
-        {/* TODO: Add Overlay Layer here */}
+        
+        {/* Overlay Layer */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Svg height="100%" width="100%">
+            {renderOverlay()}
+          </Svg>
+        </View>
       </View>
 
       <ScrollView style={styles.resultsList}>

@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } fr
 import { Stack, useRouter } from 'expo-router';
 import { ResizeMode, Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadAsync, FileSystemUploadType } from 'expo-file-system';
+// @ts-ignore - The legacy export exists but might not be picked up by strict type checking in all environments
+import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -52,6 +53,8 @@ export default function Home() {
           pathname: '/results',
           params: { 
             analysis: JSON.stringify(data.analysis),
+            tracking: JSON.stringify(data.tracking),
+            metadata: JSON.stringify(data.metadata),
             videoUri: videoUri 
           }
         });

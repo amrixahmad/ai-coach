@@ -6,3 +6,4 @@ google-generativeai
 mediapipe
 opencv-python-headless
 numpy
+python-dotenv
