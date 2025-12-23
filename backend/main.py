@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 from pathlib import Path
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import mediapipe as mp
 import cv2
 import numpy as np
@@ -27,29 +28,38 @@ app.add_middleware(
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Configure Gemini
+# Configure Gemini Client
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = None
 if GENAI_API_KEY:
-    genai.configure(api_key=GENAI_API_KEY)
+    client = genai.Client(api_key=GENAI_API_KEY)
 
-# Initialize MediaPipe
+# Initialize MediaPipe (Robust handling for Python 3.11/3.13)
 mp_pose = None
 pose = None
 try:
+    # Try standard access first
     if hasattr(mp, 'solutions'):
         mp_pose = mp.solutions.pose
-        pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
     else:
-        print("Warning: mediapipe.solutions not found. Pose tracking will be disabled.")
+        # Fallback: Try explicit import structure which some versions require
+        import mediapipe.python.solutions.pose as mp_pose
+    
+    if mp_pose:
+        pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+        print("MediaPipe initialized successfully.")
+    else:
+        print("Warning: Could not load mediapipe.solutions.pose. Tracking disabled.")
+
 except Exception as e:
-    print(f"Warning: Failed to initialize MediaPipe: {e}")
+    print(f"Warning: MediaPipe initialization failed: {e}. Pose tracking will be disabled.")
 
 @app.get("/")
 def read_root():
     return {"message": "AI Coach Backend is running"}
 
 def analyze_video_with_gemini(video_path):
-    if not GENAI_API_KEY:
+    if not client:
         # Return mock data if no key provided
         return {
             "shots": [
@@ -63,19 +73,19 @@ def analyze_video_with_gemini(video_path):
         }
     
     print("Uploading video to Gemini...")
-    video_file = genai.upload_file(path=video_path)
+    # The new SDK handles upload and state checking more gracefully
+    video_file = client.files.upload(file=video_path)
     
-    # Wait for processing
+    # Wait for processing (polling)
     while video_file.state.name == "PROCESSING":
         print('.', end='', flush=True)
         time.sleep(1)
-        video_file = genai.get_file(video_file.name)
+        video_file = client.files.get(name=video_file.name)
 
     if video_file.state.name == "FAILED":
         raise ValueError(f"Video processing failed: {video_file.state.name}")
 
     print("\nGenerating analysis...")
-    model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
     
     prompt = """
     Analyze this basketball video and output a JSON object with the following structure for each shot attempt:
@@ -94,20 +104,30 @@ def analyze_video_with_gemini(video_path):
     Only output valid JSON.
     """
     
-    response = model.generate_content([video_file, prompt], request_options={"timeout": 600})
+    # Use gemini-2.0-flash or gemini-1.5-flash
+    response = client.models.generate_content(
+        model='gemini-2.0-flash-exp', 
+        contents=[video_file, prompt],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json"
+        )
+    )
     
     try:
-        # Extract JSON from code block if present
+        # The response text should be JSON because of response_mime_type
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Error parsing Gemini response: {e}")
+        # Fallback parsing
         text = response.text
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         elif "```" in text:
             text = text.split("```")[1].split("```")[0]
-            
-        return json.loads(text)
-    except Exception as e:
-        print(f"Error parsing Gemini response: {e}")
-        return {"error": "Failed to parse analysis", "raw_response": response.text}
+        try:
+            return json.loads(text)
+        except:
+            return {"error": "Failed to parse analysis", "raw_response": response.text}
 
 def process_pose_tracking(video_path):
     cap = cv2.VideoCapture(str(video_path))
