@@ -9,7 +9,13 @@ A mobile app that analyzes your basketball shot using Gemini and MediaPipe.
 
 ## Setup Instructions
 
-### 1. Backend Setup (Python)
+### 1. Supabase Setup (Database & Auth)
+1.  Create a project at [supabase.com](https://supabase.com).
+2.  Go to the **SQL Editor** in your Supabase dashboard.
+3.  Copy the contents of `backend/schema.sql` and run it to set up the tables and security policies.
+4.  Get your **URL**, **Anon Key** (for App), and **Service Role Key** (for Backend).
+
+### 2. Backend Setup (Python)
 The backend handles video processing, calling Gemini API, and running MediaPipe.
 
 1. Navigate to backend: `cd backend`
@@ -27,15 +33,19 @@ The backend handles video processing, calling Gemini API, and running MediaPipe.
    ```
 4. Set up Environment Variables:
    - Create a `.env` file in `backend/`
-   - Add your Gemini API Key: `GEMINI_API_KEY=your_key_here`
-   - (Get a key from [aistudio.google.com](https://aistudio.google.com/))
+   - Add your keys:
+     ```
+     GEMINI_API_KEY=your_gemini_key
+     SUPABASE_URL=your_supabase_url
+     SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+     ```
 
 5. Run the server:
    ```bash
    uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
-### 2. Mobile App Setup (Expo)
+### 3. Mobile App Setup (Expo)
 The frontend allows recording/uploading videos and viewing results.
 
 1. Navigate to app: `cd mobile-app`
@@ -45,10 +55,10 @@ The frontend allows recording/uploading videos and viewing results.
    ```
 3. Set up Environment Variables:
    - Rename/Create `.env`
-   - Add Supabase keys (if using Auth later):
+   - Add Supabase keys:
      ```
-     EXPO_PUBLIC_SUPABASE_URL=your_url
-     EXPO_PUBLIC_SUPABASE_ANON_KEY=your_key
+     EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+     EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
      ```
 4. **Important**: Update Backend URL
    - Open `app/index.tsx`
@@ -64,8 +74,12 @@ The frontend allows recording/uploading videos and viewing results.
    ```
 
 ## Workflow
-1. User picks a video in the App.
-2. App uploads video to `http://<backend>/process-video`.
-3. Backend uploads to Gemini for semantic analysis + runs MediaPipe for head tracking.
-4. Backend returns JSON.
-5. App displays results.
+1. **Auth**: User logs in or signs up via the Mobile App.
+2. **Input**: User picks a video.
+3. **Processing**:
+   - App uploads video to `http://<backend>/process-video` with Auth Token.
+   - Backend verifies user.
+   - Backend uploads video to Supabase Storage.
+   - Backend uploads to Gemini for analysis + runs MediaPipe.
+   - Backend saves results to Supabase Database.
+4. **Result**: App displays results.

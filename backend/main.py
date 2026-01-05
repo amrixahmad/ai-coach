@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
@@ -11,6 +11,7 @@ import numpy as np
 import json
 import time
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 load_dotenv()
 
@@ -27,6 +28,16 @@ app.add_middleware(
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# Configure Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") # Use Service Role Key for backend operations
+supabase: Client = None
+
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    print("Warning: Supabase credentials not found. Persistence disabled.")
 
 # Configure Gemini Client
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -57,6 +68,21 @@ except Exception as e:
 @app.get("/")
 def read_root():
     return {"message": "AI Coach Backend is running"}
+
+async def get_current_user(authorization: str = Header(None)):
+    if not supabase:
+        return None
+        
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization Header")
+    
+    try:
+        token = authorization.replace("Bearer ", "")
+        user = supabase.auth.get_user(token)
+        return user.user
+    except Exception as e:
+        print(f"Auth Error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid Token")
 
 def analyze_video_with_gemini(video_path):
     if not client:
@@ -170,7 +196,10 @@ def process_pose_tracking(video_path):
     return tracking_data, fps, width, height
 
 @app.post("/process-video")
-async def process_video(file: UploadFile = File(...)):
+async def process_video(
+    file: UploadFile = File(...), 
+    user: object = Depends(get_current_user)
+):
     try:
         file_path = UPLOAD_DIR / file.filename
         with file_path.open("wb") as buffer:
@@ -182,6 +211,41 @@ async def process_video(file: UploadFile = File(...)):
         # 2. Get Motion Tracking (Optional: can be disabled for speed)
         tracking_result, fps, width, height = process_pose_tracking(file_path)
         
+        # 3. Upload to Supabase Storage & Save to DB
+        video_url = None
+        if supabase and user:
+            try:
+                # Read file binary for upload
+                with open(file_path, 'rb') as f:
+                    file_bytes = f.read()
+                
+                # Path: user_id/timestamp_filename
+                storage_path = f"{user.id}/{int(time.time())}_{file.filename}"
+                
+                # Upload to 'videos' bucket
+                supabase.storage.from_("videos").upload(
+                    path=storage_path,
+                    file=file_bytes,
+                    file_options={"content-type": file.content_type}
+                )
+                
+                # Get public URL (or use path if private)
+                video_url = supabase.storage.from_("videos").get_public_url(storage_path)
+                
+                # Insert into analyses table
+                supabase.table("analyses").insert({
+                    "user_id": user.id,
+                    "video_url": video_url,
+                    "gemini_analysis": analysis_result,
+                    "tracking_data": tracking_result
+                }).execute()
+                
+                print("Successfully saved analysis to Supabase")
+                
+            except Exception as e:
+                print(f"Error saving to Supabase: {e}")
+                # Don't fail the whole request if persistence fails
+        
         # Cleanup
         os.remove(file_path)
         
@@ -191,7 +255,8 @@ async def process_video(file: UploadFile = File(...)):
             "metadata": {
                 "fps": fps,
                 "width": width,
-                "height": height
+                "height": height,
+                "video_url": video_url
             }
         }
     except Exception as e:

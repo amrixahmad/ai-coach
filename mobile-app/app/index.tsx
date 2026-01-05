@@ -7,6 +7,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabase';
 
 import { Platform } from 'react-native';
 
@@ -21,6 +23,11 @@ export default function Home() {
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
+  const { session } = useAuth();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const pickVideo = async () => {
     // No permissions request is necessary for launching the image library
@@ -45,6 +52,7 @@ export default function Home() {
       
       let responseStatus;
       let responseBody;
+      const token = session?.access_token;
 
       if (Platform.OS === 'web') {
         // Web Upload using Fetch
@@ -53,19 +61,31 @@ export default function Home() {
         const formData = new FormData();
         formData.append('file', blob, 'upload.mp4');
 
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const res = await fetch(BACKEND_URL, {
           method: 'POST',
           body: formData,
+          headers: headers,
         });
 
         responseStatus = res.status;
         responseBody = await res.text();
       } else {
         // Native Upload using Expo FileSystem
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const res = await uploadAsync(BACKEND_URL, videoUri, {
           fieldName: 'file',
           httpMethod: 'POST',
           uploadType: FileSystemUploadType.MULTIPART,
+          headers: headers,
         });
         responseStatus = res.status;
         responseBody = res.body;
@@ -102,7 +122,12 @@ export default function Home() {
       <Stack.Screen options={{ title: 'AI Coach', headerShown: false }} />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>AI Basketball Coach</Text>
+        <View style={styles.headerTop}>
+            <Text style={styles.headerTitle}>AI Basketball Coach</Text>
+            <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+                <Ionicons name="log-out-outline" size={24} color="#64748b" />
+            </TouchableOpacity>
+        </View>
         <Text style={styles.headerSubtitle}>Upload a shot to get pro feedback</Text>
       </View>
 
@@ -151,6 +176,7 @@ export default function Home() {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -160,10 +186,19 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 40,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  signOutButton: {
+    padding: 8,
+  },
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
     color: '#0f172a',
+    flex: 1,
   },
   headerSubtitle: {
     fontSize: 16,
