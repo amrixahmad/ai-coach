@@ -132,9 +132,14 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
             <Text style={styles.headerTitle}>AI Basketball Coach</Text>
-            <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-                <Ionicons name="log-out-outline" size={24} color="#64748b" />
-            </TouchableOpacity>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity onPress={() => router.push('/history')} style={styles.historyButton}>
+                <Ionicons name="time-outline" size={24} color="#6366f1" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+                  <Ionicons name="log-out-outline" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
         </View>
         <Text style={styles.headerSubtitle}>Upload a shot to get pro feedback</Text>
       </View>
@@ -198,6 +203,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyButton: {
+    padding: 8,
+    backgroundColor: '#eef2ff',
+    borderRadius: 8,
   },
   signOutButton: {
     padding: 8,
