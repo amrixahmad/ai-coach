@@ -12,12 +12,20 @@ import { supabase } from '../utils/supabase';
 
 import { Platform } from 'react-native';
 
-// CHANGE THIS TO YOUR COMPUTER'S LOCAL IP ADDRESS if testing on real device
-// For Android Emulator, use 'http://10.0.2.2:8000'
-// For iOS Simulator and Web, use 'http://localhost:8000'
-const BACKEND_URL = Platform.OS === 'android' 
-  ? 'http://10.0.2.2:8000/process-video'
-  : 'http://localhost:8000/process-video';
+// Backend URL: Uses environment variable in production, falls back to local dev URLs
+const getBackendUrl = () => {
+  // Production: Use environment variable
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  // Development fallbacks
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8000/process-video';
+  }
+  return 'http://localhost:8000/process-video';
+};
+
+const BACKEND_URL = getBackendUrl();
 
 export default function Home() {
   const [videoUri, setVideoUri] = useState<string | null>(null);
