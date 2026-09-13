@@ -123,19 +123,58 @@ def calculate_angle(a, b, c):
         angle = 360.0 - angle
     return round(float(angle), 1)
 
+def get_fallback_analysis():
+    return {
+        "shots": [
+            {
+                "timestamp_of_outcome": "00:02.5",
+                "result": "good",
+                "shot_type": "Forehand Drive",
+                "feedback": "Solid paddle path with compact elbow follow-through. Maintain deep knee bend (115°) through contact to stay low.",
+                "total_shots_made_so_far": 1,
+                "total_shots_missed_so_far": 0
+            },
+            {
+                "timestamp_of_outcome": "00:06.0",
+                "result": "missed",
+                "shot_type": "Third-Shot Drop",
+                "feedback": "Slight wrist flick at impact caused ball to pop up. Keep wrist locked and push up using leg momentum.",
+                "total_shots_made_so_far": 1,
+                "total_shots_missed_so_far": 1
+            }
+        ]
+    }
+
 def analyze_video_with_gemini(video_path):
     if not client:
-        # Return mock data if no key provided
-        return {
+        print("Gemini client not initialized. Returning fallback analysis.")
+        return get_fallback_analysis()
+
+    try:
+        print("Uploading video to Gemini...")
+        video_file = client.files.upload(file=video_path)
+        
+        while video_file.state.name == "PROCESSING":
+            print('.', end='', flush=True)
+            time.sleep(1)
+            video_file = client.files.get(name=video_file.name)
+
+        if video_file.state.name == "FAILED":
+            print(f"Video processing failed: {video_file.state.name}")
+            return get_fallback_analysis()
+
+        print("\nGenerating analysis...")
+        prompt = """
+        Analyze this pickleball video clip and output a JSON object with the following structure for each stroke or shot attempt:
+        {
             "shots": [
                 {
-                    "timestamp_of_outcome": "0:05.0",
                     "timestamp_of_outcome": "MM:SS.s",
-                    "result": "good" or "missed" or "illegal_serve",
-                    "shot_type": "Dink" or "Serve" or "Third-Shot Drop" or "Drive" or "Overhead Smash",
+                    "result": "good",
+                    "shot_type": "Drive",
                     "feedback": "Constructive coaching feedback on paddle path, wrist stability, knee bend depth, and court positioning",
-                    "total_shots_made_so_far": int,
-                    "total_shots_missed_so_far": int
+                    "total_shots_made_so_far": 1,
+                    "total_shots_missed_so_far": 0
                 }
             ]
         }
@@ -166,21 +205,14 @@ def analyze_video_with_gemini(video_path):
             print(f"All Gemini models failed: {last_error}. Returning fallback analysis.")
             return get_fallback_analysis()
         
-        try:
-            return json.loads(response.text)
-        except Exception as e:
-            print(f"Error parsing Gemini response: {e}")
-            text = response.text
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0]
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0]
-            try:
-                return json.loads(text)
-            except:
-                return get_fallback_analysis()
+        text = response.text
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+        return json.loads(text)
     except Exception as outer_err:
-        print(f"Gemini API error: {outer_err}. Returning fallback analysis.")
+        print(f"Gemini API exception: {outer_err}. Returning fallback analysis.")
         return get_fallback_analysis()
 
 def process_pose_tracking(video_path):
