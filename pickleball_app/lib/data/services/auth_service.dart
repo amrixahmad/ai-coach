@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_config.dart';
 
 class UserProfile {
   final String id;
@@ -26,7 +27,7 @@ class AuthService extends ChangeNotifier {
     _loadPersistedSession();
   }
 
-  final String baseUrl = 'http://localhost:8000';
+  String get baseUrl => ApiConfig.baseUrl;
 
   String? _accessToken;
   UserProfile? _user;

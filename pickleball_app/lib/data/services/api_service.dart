@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'api_config.dart';
 import '../models/stroke_analysis.dart';
 import '../models/tracking_frame.dart';
 
@@ -39,16 +40,17 @@ class SavedAnalysis {
         .map((item) => TrackingFrame.fromJson(item as Map<String, dynamic>))
         .toList();
 
-    final videoUrl = json['video_url'] as String?;
+    final rawVideoUrl = json['video_url'] as String?;
+    final resolvedVideoUrl = ApiConfig.resolveUrl(rawVideoUrl);
 
     return SavedAnalysis(
       id: json['id'] ?? '',
-      videoUrl: videoUrl,
+      videoUrl: resolvedVideoUrl,
       createdAt: json['created_at'] as String?,
       analysisResult: AnalysisResult(
         analysis: strokeAnalysis,
         tracking: trackingList,
-        videoUrl: videoUrl,
+        videoUrl: resolvedVideoUrl,
       ),
     );
   }
@@ -57,7 +59,7 @@ class SavedAnalysis {
 class ApiService {
   final String baseUrl;
 
-  ApiService({this.baseUrl = 'http://localhost:8000'});
+  ApiService({String? baseUrl}) : baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   Future<AnalysisResult> processVideo(XFile videoFile, {String? authToken}) async {
     final uri = Uri.parse('$baseUrl/process-video');
@@ -92,12 +94,13 @@ class ApiService {
           .toList();
 
       final metadata = data['metadata'] as Map<String, dynamic>?;
-      final videoUrl = metadata?['video_url'] as String?;
+      final rawVideoUrl = metadata?['video_url'] as String?;
+      final resolvedVideoUrl = ApiConfig.resolveUrl(rawVideoUrl);
 
       return AnalysisResult(
         analysis: strokeAnalysis,
         tracking: trackingList,
-        videoUrl: videoUrl,
+        videoUrl: resolvedVideoUrl,
       );
     } else {
       throw Exception('Failed to process video: HTTP ${response.statusCode}');
