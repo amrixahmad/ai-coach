@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application source code
 COPY backend/ .
 
+# Copy Flutter Web frontend build
+COPY pickleball_app/build/web ./static_web
+
 EXPOSE 8000
 
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

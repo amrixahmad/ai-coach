@@ -38,8 +38,15 @@ app.add_middleware(
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+from fastapi.responses import FileResponse
+
 # Serve uploaded videos as static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Serve Flutter Web frontend as static files if built inside container
+STATIC_WEB_DIR = Path("static_web")
+if STATIC_WEB_DIR.exists():
+    app.mount("/app", StaticFiles(directory="static_web", html=True), name="static_web")
 
 # Configure Gemini Client
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
