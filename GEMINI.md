@@ -93,6 +93,7 @@ flutter run -d web-server --web-port 8080 --web-hostname localhost
 - **Interactive Timeline Seeking**: Tapping any stroke card in `ResultsView` automatically parses the timestamp (`MM:SS.s`) and seeks the video player directly to that shot timestamp (`_seekToStroke`), highlighting the selected card with an active border.
 - **History View & Session Persistence**: Past coaching runs are saved to SQLite (`app.db`) and accessible via `GET /analyses`. Users can view past sessions on the new `HistoryView` screen (`pickleball_app/lib/ui/features/history/history_view.dart`) and replay any past analysis with one tap.
 - **Mobile UI/UX Shell & Profile Dashboard**: Material 3 `NavigationBar` shell ([main_shell.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/ui/shell/main_shell.dart)) hosting 3 tabs (**Coach**, **History**, **Profile**), custom Teal court palette, and a performance stats dashboard ([profile_view.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/ui/features/profile/profile_view.dart)).
+- **Video Preview & Multi-Stage Analysis Progress**: On [home_view.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/ui/features/home/home_view.dart), selecting a clip instantiates an inline video preview with metadata (filename, file size in MB), and clicking analyze triggers a step-by-step 3-stage progress card (*Stage 1: Uploading, Stage 2: Pose Tracking, Stage 3: Gemini AI Analysis*).
 
 ---
 

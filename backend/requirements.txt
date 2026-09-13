@@ -10,3 +10,5 @@ python-dotenv
 PyJWT
 passlib[bcrypt]
 SQLAlchemy
+boto3
+
