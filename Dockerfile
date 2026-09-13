@@ -18,11 +18,8 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend application source code
+# Copy backend application source code (including static_web)
 COPY backend/ .
-
-# Copy Flutter Web frontend build
-COPY pickleball_app/build/web ./static_web
 
 EXPOSE 8000
 
