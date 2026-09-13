@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 import json
 import time
+import re
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
@@ -166,13 +167,28 @@ def analyze_video_with_gemini(video_path):
     Only output valid JSON.
     """
     
-    response = client.models.generate_content(
-        model='gemini-2.0-flash-exp', 
-        contents=[video_file, prompt],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json"
-        )
-    )
+    models_to_try = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
+    response = None
+    last_error = None
+    for m in models_to_try:
+        try:
+            print(f"Trying Gemini model: {m}")
+            response = client.models.generate_content(
+                model=m, 
+                contents=[video_file, prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            if response:
+                print(f"Successfully generated response with {m}")
+                break
+        except Exception as err:
+            print(f"Model {m} failed: {err}")
+            last_error = err
+
+    if not response:
+        raise last_error
     
     try:
         return json.loads(response.text)
@@ -255,7 +271,8 @@ async def process_video(
         user_upload_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp = int(time.time())
-        saved_filename = f"{timestamp}_{file.filename}"
+        clean_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename or 'upload.mp4')
+        saved_filename = f"{timestamp}_{clean_filename}"
         file_path = user_upload_dir / saved_filename
         
         with file_path.open("wb") as buffer:
@@ -293,3 +310,34 @@ async def process_video(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analyses")
+def get_user_analyses(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    records = db.query(Analysis).filter(Analysis.user_id == user.id).order_by(Analysis.created_at.desc()).all()
+    return [
+        {
+            "id": rec.id,
+            "video_url": rec.video_url,
+            "created_at": rec.created_at.isoformat() if rec.created_at else None,
+            "gemini_analysis": rec.gemini_analysis,
+            "tracking_data": rec.tracking_data
+        }
+        for rec in records
+    ]
+
+@app.delete("/analyses/{analysis_id}")
+def delete_analysis(
+    analysis_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    record = db.query(Analysis).filter(Analysis.id == analysis_id, Analysis.user_id == user.id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    db.delete(record)
+    db.commit()
+    return {"message": "Deleted successfully"}
+

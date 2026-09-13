@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'data/services/auth_service.dart';
 import 'ui/features/auth/login_view.dart';
-import 'ui/features/home/home_view.dart';
+import 'ui/shell/main_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +18,11 @@ class PickleballCoachApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.teal,
+          primary: Colors.teal.shade700,
+          secondary: Colors.indigo.shade800,
+        ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       ),
       home: const AuthGate(),
@@ -34,8 +38,13 @@ class AuthGate extends StatelessWidget {
     return ListenableBuilder(
       listenable: AuthService(),
       builder: (context, _) {
+        if (!AuthService().isInitialized) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
         if (AuthService().isAuthenticated) {
-          return const HomeView();
+          return const MainShell();
         }
         return const LoginView();
       },

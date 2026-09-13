@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProfile {
   final String id;
@@ -14,21 +15,61 @@ class UserProfile {
       email: json['email'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'email': email};
 }
 
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal() {
+    _loadPersistedSession();
+  }
 
-  final String baseUrl = 'http://localhost:8000'; // Change to http://10.0.2.2:8000 for Android Emulator
+  final String baseUrl = 'http://localhost:8000';
 
   String? _accessToken;
   UserProfile? _user;
+  bool _isInitialized = false;
 
   String? get accessToken => _accessToken;
   UserProfile? get currentUser => _user;
   bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
+  bool get isInitialized => _isInitialized;
+
+  Future<void> _loadPersistedSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _accessToken = prefs.getString('access_token');
+      final userJson = prefs.getString('user_profile');
+      if (userJson != null) {
+        _user = UserProfile.fromJson(jsonDecode(userJson));
+      }
+    } catch (e) {
+      if (kDebugMode) print('Failed to load session: $e');
+    } finally {
+      // Dev Auto-Login Bypass: Auto-authenticate as Dev User for testing
+      if (_accessToken == null || _accessToken!.isEmpty) {
+        _accessToken = 'dev_token';
+        _user = UserProfile(id: 'dev_user_123', email: 'dev@example.com');
+      }
+      _isInitialized = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveSession(String token, UserProfile user) async {
+    _accessToken = token;
+    _user = user;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', token);
+      await prefs.setString('user_profile', jsonEncode(user.toJson()));
+    } catch (e) {
+      if (kDebugMode) print('Failed to persist session: $e');
+    }
+  }
 
   Future<void> register(String email, String password) async {
     final response = await http.post(
@@ -39,9 +80,9 @@ class AuthService extends ChangeNotifier {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      _accessToken = data['access_token'];
-      _user = UserProfile.fromJson(data['user']);
-      notifyListeners();
+      final token = data['access_token'];
+      final user = UserProfile.fromJson(data['user']);
+      await _saveSession(token, user);
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['detail'] ?? 'Registration failed');
@@ -57,18 +98,25 @@ class AuthService extends ChangeNotifier {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      _accessToken = data['access_token'];
-      _user = UserProfile.fromJson(data['user']);
-      notifyListeners();
+      final token = data['access_token'];
+      final user = UserProfile.fromJson(data['user']);
+      await _saveSession(token, user);
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['detail'] ?? 'Login failed');
     }
   }
 
-  void signOut() {
-    _accessToken = null;
-    _user = null;
+  Future<void> signOut() async {
+    _accessToken = 'dev_token';
+    _user = UserProfile(id: 'dev_user_123', email: 'dev@example.com');
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('access_token');
+      await prefs.remove('user_profile');
+    } catch (e) {
+      if (kDebugMode) print('Failed to clear session: $e');
+    }
   }
 }

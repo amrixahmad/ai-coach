@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../data/services/api_service.dart';
 import '../../../data/services/auth_service.dart';
+import '../history/history_view.dart';
 import '../results/results_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -62,7 +63,17 @@ class _HomeViewState extends State<HomeView> {
         title: const Text('AI Pickleball Coach', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history_outlined),
+            tooltip: 'Past Sessions',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const HistoryView()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
             onPressed: () => AuthService().signOut(),
           ),
         ],
