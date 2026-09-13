@@ -46,7 +46,12 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Serve Flutter Web frontend as static files if built inside container
 STATIC_WEB_DIR = Path("static_web")
 if STATIC_WEB_DIR.exists():
-    app.mount("/app", StaticFiles(directory="static_web", html=True), name="static_web")
+    app.mount("/web", StaticFiles(directory="static_web", html=True), name="static_web")
+
+    @app.get("/ui", include_in_schema=False)
+    @app.get("/web", include_in_schema=False)
+    def serve_web_index():
+        return FileResponse(STATIC_WEB_DIR / "index.html")
 
 # Configure Gemini Client
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
