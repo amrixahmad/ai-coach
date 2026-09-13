@@ -44,9 +44,16 @@ from fastapi.responses import FileResponse
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Serve Flutter Web frontend as static files if built inside container
-STATIC_WEB_DIR = Path("static_web")
-if STATIC_WEB_DIR.exists():
-    app.mount("/web", StaticFiles(directory="static_web", html=True), name="static_web")
+possible_static_paths = [
+    Path("static_web"),
+    Path("/app/static_web"),
+    Path(__file__).parent / "static_web",
+]
+STATIC_WEB_DIR = next((p for p in possible_static_paths if p.exists()), None)
+print(f"Startup CWD: {os.getcwd()}, STATIC_WEB_DIR resolved to: {STATIC_WEB_DIR}")
+
+if STATIC_WEB_DIR:
+    app.mount("/web", StaticFiles(directory=str(STATIC_WEB_DIR), html=True), name="static_web")
 
     @app.get("/ui", include_in_schema=False)
     @app.get("/web", include_in_schema=False)
