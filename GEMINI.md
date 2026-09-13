@@ -101,6 +101,7 @@ flutter run -d web-server --web-port 8080 --web-hostname localhost
 - **Production Web App URL (Vercel Static)**: [https://temporary-racing-monsoon-v3qounh.vercel.app](https://temporary-racing-monsoon-v3qounh.vercel.app)
 - **Root Dockerfile & Railway Auto-Deploy**: Created root `Dockerfile` and `railway.json` mapping `backend/` files so pushing to `origin main` automatically builds and deploys to Railway cleanly.
 - **Frontend API Config**: Created `ApiConfig` in [api_config.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/data/services/api_config.dart) defaulting to Railway Production API, with `--dart-define=API_URL=...` override for local dev testing.
+- **Mandatory User Authentication Enforced**: Removed Dev Auto-Login bypass in `auth_service.dart`. Web UI and mobile clients now require real email/password registration and login (`/auth/register` & `/auth/login`) with JWT token persistence.
 - **Robust Gemini Fallback**: Wrapped Gemini API calls in `main.py` with try/except fallback (`get_fallback_analysis`) to guarantee uninterrupted pose tracking analysis even if Gemini API rates or prepayments are temporarily exhausted.
 - **End-to-End Test Verified**: Video uploads process through MediaPipe pose tracking, store relative URLs (`/uploads/dev_user_123/...`), and persist structured coaching records into Railway PostgreSQL database (`GET /analyses` verified returning HTTP 200).
 
