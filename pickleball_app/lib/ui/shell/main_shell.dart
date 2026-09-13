@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../features/history/history_view.dart';
 import '../features/home/home_view.dart';
 import '../features/profile/profile_view.dart';
@@ -20,6 +22,47 @@ class _MainShellState extends State<MainShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _restoreActiveTab();
+  }
+
+  Future<void> _restoreActiveTab() async {
+    try {
+      final fragment = Uri.base.fragment.toLowerCase();
+      final tabParam = Uri.base.queryParameters['tab']?.toLowerCase();
+      
+      if (fragment.contains('history') || tabParam == 'history') {
+        if (mounted) setState(() => _currentIndex = 1);
+        return;
+      } else if (fragment.contains('profile') || tabParam == 'profile') {
+        if (mounted) setState(() => _currentIndex = 2);
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final savedTab = prefs.getInt('last_active_tab');
+      if (savedTab != null && savedTab >= 0 && savedTab < _pages.length) {
+        if (mounted) {
+          setState(() => _currentIndex = savedTab);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('Failed to restore active tab: $e');
+    }
+  }
+
+  void _onTabSelected(int index) async {
+    setState(() {
+      _currentIndex = index;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('last_active_tab', index);
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
@@ -28,11 +71,7 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onDestinationSelected: _onTabSelected,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.videocam_outlined),
