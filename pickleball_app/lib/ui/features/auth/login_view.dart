@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../data/services/supabase_service.dart';
+import '../../../data/services/auth_service.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -21,19 +21,14 @@ class _LoginViewState extends State<LoginView> {
       final password = _passwordController.text.trim();
 
       if (_isSignUp) {
-        await SupabaseService().signUp(email: email, password: password);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Account created! Please log in.')),
-          );
-        }
+        await AuthService().register(email, password);
       } else {
-        await SupabaseService().signIn(email: email, password: password);
+        await AuthService().login(email, password);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Auth Error: ${e.toString()}')),
+          SnackBar(content: Text('Auth Error: ${e.toString().replaceAll("Exception: ", "")}')),
         );
       }
     } finally {

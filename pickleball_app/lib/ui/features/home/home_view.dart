@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../data/services/api_service.dart';
-import '../../../data/services/supabase_service.dart';
+import '../../../data/services/auth_service.dart';
 import '../results/results_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -32,7 +32,7 @@ class _HomeViewState extends State<HomeView> {
 
     setState(() => _isUploading = true);
     try {
-      final token = SupabaseService().currentAccessToken;
+      final token = AuthService().accessToken;
       final result = await _apiService.processVideo(_selectedVideo!, authToken: token);
 
       if (mounted) {
@@ -64,7 +64,7 @@ class _HomeViewState extends State<HomeView> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => SupabaseService().signOut(),
+            onPressed: () => AuthService().signOut(),
           ),
         ],
       ),

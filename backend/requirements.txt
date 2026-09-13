@@ -7,3 +7,6 @@ mediapipe==0.10.14
 opencv-python-headless
 numpy
 python-dotenv
+PyJWT
+passlib[bcrypt]
+SQLAlchemy

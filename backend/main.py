@@ -1,5 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import shutil
 import os
 from pathlib import Path
@@ -11,9 +13,15 @@ import numpy as np
 import json
 import time
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from sqlalchemy.orm import Session
+
+from database import init_db, get_db, User, Analysis
+from auth import hash_password, verify_password, create_access_token, get_current_user
 
 load_dotenv()
+
+# Initialize SQLite DB tables on startup
+init_db()
 
 app = FastAPI()
 
@@ -29,15 +37,8 @@ app.add_middleware(
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Configure Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") # Use Service Role Key for backend operations
-supabase: Client = None
-
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    print("Warning: Supabase credentials not found. Persistence disabled.")
+# Serve uploaded videos as static files
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Configure Gemini Client
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -45,15 +46,13 @@ client = None
 if GENAI_API_KEY:
     client = genai.Client(api_key=GENAI_API_KEY)
 
-# Initialize MediaPipe (Robust handling for Python 3.11/3.13)
+# Initialize MediaPipe
 mp_pose = None
 pose = None
 try:
-    # Try standard access first
     if hasattr(mp, 'solutions'):
         mp_pose = mp.solutions.pose
     else:
-        # Fallback: Try explicit import structure which some versions require
         import mediapipe.python.solutions.pose as mp_pose
     
     if mp_pose:
@@ -65,24 +64,52 @@ try:
 except Exception as e:
     print(f"Warning: MediaPipe initialization failed: {e}. Pose tracking will be disabled.")
 
+# Pydantic Schemas for Auth
+class UserRegister(BaseModel):
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
 @app.get("/")
 def read_root():
-    return {"message": "AI Coach Backend is running"}
+    return {"message": "AI Pickleball Coach Backend is running"}
 
-async def get_current_user(authorization: str = Header(None)):
-    if not supabase:
-        return None
-        
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization Header")
+@app.post("/auth/register")
+def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    try:
-        token = authorization.replace("Bearer ", "")
-        user = supabase.auth.get_user(token)
-        return user.user
-    except Exception as e:
-        print(f"Auth Error: {e}")
-        raise HTTPException(status_code=401, detail="Invalid Token")
+    user = User(
+        email=user_data.email,
+        hashed_password=hash_password(user_data.password)
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    token = create_access_token(user.id, user.email)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": user.id, "email": user.email}
+    }
+
+@app.post("/auth/login")
+def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_data.email).first()
+    if not user or not verify_password(user_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    token = create_access_token(user.id, user.email)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": user.id, "email": user.email}
+    }
 
 def calculate_angle(a, b, c):
     """Calculates 2D angle (in degrees) at joint 'b' given 3 points [x, y]"""
@@ -110,10 +137,8 @@ def analyze_video_with_gemini(video_path):
         }
     
     print("Uploading video to Gemini...")
-    # The new SDK handles upload and state checking more gracefully
     video_file = client.files.upload(file=video_path)
     
-    # Wait for processing (polling)
     while video_file.state.name == "PROCESSING":
         print('.', end='', flush=True)
         time.sleep(1)
@@ -141,7 +166,6 @@ def analyze_video_with_gemini(video_path):
     Only output valid JSON.
     """
     
-    # Use gemini-2.0-flash or gemini-1.5-flash
     response = client.models.generate_content(
         model='gemini-2.0-flash-exp', 
         contents=[video_file, prompt],
@@ -151,11 +175,9 @@ def analyze_video_with_gemini(video_path):
     )
     
     try:
-        # The response text should be JSON because of response_mime_type
         return json.loads(response.text)
     except Exception as e:
         print(f"Error parsing Gemini response: {e}")
-        # Fallback parsing
         text = response.text
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
@@ -179,8 +201,6 @@ def process_pose_tracking(video_path):
         return tracking_data, fps, width, height
 
     frame_count = 0
-    
-    # Process every 5th frame to speed up
     process_every_n = 5
     
     while cap.isOpened():
@@ -194,7 +214,7 @@ def process_pose_tracking(video_path):
             
             if results.pose_landmarks:
                 landmarks = results.pose_landmarks.landmark
-                head = landmarks[0] # Nose/Head
+                head = landmarks[0]
 
                 # Right Arm (12: shoulder, 14: elbow, 16: wrist)
                 shoulder_r = [landmarks[12].x, landmarks[12].y]
@@ -227,56 +247,37 @@ def process_pose_tracking(video_path):
 @app.post("/process-video")
 async def process_video(
     file: UploadFile = File(...), 
-    user: object = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        file_path = UPLOAD_DIR / file.filename
+        user_upload_dir = UPLOAD_DIR / user.id
+        user_upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = int(time.time())
+        saved_filename = f"{timestamp}_{file.filename}"
+        file_path = user_upload_dir / saved_filename
+        
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
         # 1. Get AI Analysis
         analysis_result = analyze_video_with_gemini(file_path)
         
-        # 2. Get Motion Tracking (Optional: can be disabled for speed)
+        # 2. Get Motion Tracking
         tracking_result, fps, width, height = process_pose_tracking(file_path)
         
-        # 3. Upload to Supabase Storage & Save to DB
-        video_url = None
-        if supabase and user:
-            try:
-                # Read file binary for upload
-                with open(file_path, 'rb') as f:
-                    file_bytes = f.read()
-                
-                # Path: user_id/timestamp_filename
-                storage_path = f"{user.id}/{int(time.time())}_{file.filename}"
-                
-                # Upload to 'videos' bucket
-                supabase.storage.from_("videos").upload(
-                    path=storage_path,
-                    file=file_bytes,
-                    file_options={"content-type": file.content_type}
-                )
-                
-                # Get public URL (or use path if private)
-                video_url = supabase.storage.from_("videos").get_public_url(storage_path)
-                
-                # Insert into analyses table
-                supabase.table("analyses").insert({
-                    "user_id": user.id,
-                    "video_url": video_url,
-                    "gemini_analysis": analysis_result,
-                    "tracking_data": tracking_result
-                }).execute()
-                
-                print("Successfully saved analysis to Supabase")
-                
-            except Exception as e:
-                print(f"Error saving to Supabase: {e}")
-                # Don't fail the whole request if persistence fails
+        # 3. Save to local SQLite Database & serve via StaticFiles URL
+        video_url = f"http://localhost:8000/uploads/{user.id}/{saved_filename}"
         
-        # Cleanup
-        os.remove(file_path)
+        analysis_record = Analysis(
+            user_id=user.id,
+            video_url=video_url,
+            gemini_analysis=analysis_result,
+            tracking_data=tracking_result
+        )
+        db.add(analysis_record)
+        db.commit()
         
         return {
             "analysis": analysis_result,
