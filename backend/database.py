@@ -1,14 +1,22 @@
+import os
 import uuid
 import datetime
 from sqlalchemy import create_engine, Column, String, DateTime, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
+raw_db_url = os.getenv("DATABASE_URL")
+if raw_db_url:
+    if raw_db_url.startswith("postgres://"):
+        raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URL = raw_db_url
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+else:
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

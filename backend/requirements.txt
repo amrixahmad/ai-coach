@@ -11,4 +11,6 @@ PyJWT
 passlib[bcrypt]
 SQLAlchemy
 boto3
+psycopg2-binary
+
 
