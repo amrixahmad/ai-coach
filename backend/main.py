@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from database import init_db, get_db, User, Analysis
 from auth import hash_password, verify_password, create_access_token, get_current_user
-from storage import upload_file_to_r2
+from storage import upload_file_to_r2, delete_file_from_r2
 
 load_dotenv()
 
@@ -362,6 +362,25 @@ def delete_analysis(
     record = db.query(Analysis).filter(Analysis.id == analysis_id, Analysis.user_id == user.id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    # Clean up Cloudflare R2 object or local disk file if exists
+    if record.video_url:
+        video_url = record.video_url
+        if "r2.dev" in video_url or "cloudflarestorage.com" in video_url:
+            try:
+                # Key format is user_id/filename.mp4
+                object_key = "/".join(video_url.split("/")[-2:])
+                delete_file_from_r2(object_key)
+            except Exception as e:
+                print(f"Failed to parse or delete R2 object key from {video_url}: {e}")
+        elif video_url.startswith("/uploads/"):
+            try:
+                local_file = Path(video_url.lstrip("/"))
+                if local_file.exists():
+                    local_file.unlink()
+            except Exception as e:
+                print(f"Failed to delete local file {video_url}: {e}")
+
     db.delete(record)
     db.commit()
     return {"message": "Deleted successfully"}

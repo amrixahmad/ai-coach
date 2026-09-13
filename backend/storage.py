@@ -71,3 +71,21 @@ def upload_file_to_r2(local_path: Path, object_key: str) -> str | None:
     except (BotoCoreError, ClientError, Exception) as err:
         print(f"Cloudflare R2 upload error for {object_key}: {err}")
         return None
+
+def delete_file_from_r2(object_key: str) -> bool:
+    """
+    Deletes an object from Cloudflare R2 bucket.
+    """
+    client = get_s3_client()
+    if not client:
+        return False
+    
+    bucket_name = os.getenv("R2_BUCKET_NAME", "pickleball-videos")
+    try:
+        print(f"Deleting object '{object_key}' from R2 bucket '{bucket_name}'...")
+        client.delete_object(Bucket=bucket_name, Key=object_key)
+        print(f"Successfully deleted {object_key} from R2 bucket '{bucket_name}'")
+        return True
+    except (BotoCoreError, ClientError, Exception) as err:
+        print(f"Cloudflare R2 delete error for {object_key}: {err}")
+        return False
