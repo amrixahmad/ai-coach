@@ -149,7 +149,7 @@ export default function Results() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0f172a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Shot Analysis</Text>
+        <Text style={styles.headerTitle}>Stroke Analysis</Text>
       </View>
 
       <View 
@@ -186,36 +186,39 @@ export default function Results() {
       </View>
 
       <ScrollView style={styles.resultsList}>
-        <Text style={styles.sectionTitle}>Shot Breakdown</Text>
+        <Text style={styles.sectionTitle}>Stroke Breakdown</Text>
         
-        {shots.map((shot: any, index: number) => (
-          <TouchableOpacity 
-            key={index} 
-            style={[
-              styles.shotCard, 
-              activeShotIndex === index && styles.activeCard
-            ]}
-            onPress={() => setActiveShotIndex(index)}
-          >
-            <View style={styles.shotHeader}>
-              <View style={[
-                styles.badge, 
-                { backgroundColor: shot.result === 'made' ? '#dcfce7' : '#fee2e2' }
-              ]}>
-                <Text style={[
-                  styles.badgeText,
-                  { color: shot.result === 'made' ? '#166534' : '#991b1b' }
-                ]}>
-                  {shot.result.toUpperCase()}
-                </Text>
+        {shots.map((shot: any, index: number) => {
+          const isGood = shot.result === 'good' || shot.result === 'made';
+          const isIllegal = shot.result === 'illegal_serve';
+          
+          const badgeBg = isGood ? '#dcfce7' : isIllegal ? '#f3e8ff' : '#fee2e2';
+          const badgeColor = isGood ? '#166534' : isIllegal ? '#6b21a8' : '#991b1b';
+          const resultLabel = isGood ? 'GOOD FORM' : isIllegal ? 'ILLEGAL SERVE' : 'NEEDS IMPROVEMENT';
+
+          return (
+            <TouchableOpacity 
+              key={index} 
+              style={[
+                styles.shotCard, 
+                activeShotIndex === index && styles.activeCard
+              ]}
+              onPress={() => setActiveShotIndex(index)}
+            >
+              <View style={styles.shotHeader}>
+                <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                  <Text style={[styles.badgeText, { color: badgeColor }]}>
+                    {resultLabel}
+                  </Text>
+                </View>
+                <Text style={styles.timestamp}>{shot.timestamp_of_outcome}</Text>
               </View>
-              <Text style={styles.timestamp}>{shot.timestamp_of_outcome}</Text>
-            </View>
-            
-            <Text style={styles.shotType}>{shot.shot_type}</Text>
-            <Text style={styles.feedback}>{shot.feedback}</Text>
-          </TouchableOpacity>
-        ))}
+              
+              <Text style={styles.shotType}>{shot.shot_type}</Text>
+              <Text style={styles.feedback}>{shot.feedback}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );

@@ -131,7 +131,7 @@ export default function Home() {
       
       <View style={styles.header}>
         <View style={styles.headerTop}>
-            <Text style={styles.headerTitle}>AI Basketball Coach</Text>
+            <Text style={styles.headerTitle}>AI Pickleball Coach</Text>
             <View style={styles.headerButtons}>
               <TouchableOpacity onPress={() => router.push('/history')} style={styles.historyButton}>
                 <Ionicons name="time-outline" size={24} color="#6366f1" />
@@ -141,7 +141,7 @@ export default function Home() {
               </TouchableOpacity>
             </View>
         </View>
-        <Text style={styles.headerSubtitle}>Upload a shot to get pro feedback</Text>
+        <Text style={styles.headerSubtitle}>Upload a stroke or rally clip to get pro feedback</Text>
       </View>
 
       <View style={styles.content}>

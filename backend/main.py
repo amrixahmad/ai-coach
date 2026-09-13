@@ -84,6 +84,17 @@ async def get_current_user(authorization: str = Header(None)):
         print(f"Auth Error: {e}")
         raise HTTPException(status_code=401, detail="Invalid Token")
 
+def calculate_angle(a, b, c):
+    """Calculates 2D angle (in degrees) at joint 'b' given 3 points [x, y]"""
+    a = np.array(a)
+    b = np.array(b)
+    c = np.array(c)
+    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
+    angle = np.abs(radians * 180.0 / np.pi)
+    if angle > 180.0:
+        angle = 360.0 - angle
+    return round(float(angle), 1)
+
 def analyze_video_with_gemini(video_path):
     if not client:
         # Return mock data if no key provided
@@ -91,9 +102,9 @@ def analyze_video_with_gemini(video_path):
             "shots": [
                 {
                     "timestamp_of_outcome": "0:05.0",
-                    "result": "missed",
-                    "shot_type": "Jump shot",
-                    "feedback": "Mock feedback: Check API key."
+                    "result": "good",
+                    "shot_type": "Dink",
+                    "feedback": "Mock feedback: Good shoulder push dink. Check API key."
                 }
             ]
         }
@@ -114,14 +125,14 @@ def analyze_video_with_gemini(video_path):
     print("\nGenerating analysis...")
     
     prompt = """
-    Analyze this basketball video and output a JSON object with the following structure for each shot attempt:
+    Analyze this pickleball video clip and output a JSON object with the following structure for each stroke or shot attempt:
     {
         "shots": [
             {
                 "timestamp_of_outcome": "MM:SS.s",
-                "result": "made" or "missed",
-                "shot_type": "description of shot",
-                "feedback": "Constructive coaching feedback based on form",
+                "result": "good" or "missed" or "illegal_serve",
+                "shot_type": "Dink" or "Serve" or "Third-Shot Drop" or "Drive" or "Overhead Smash",
+                "feedback": "Constructive coaching feedback on paddle path, wrist stability, knee bend depth, and court positioning",
                 "total_shots_made_so_far": int,
                 "total_shots_missed_so_far": int
             }
@@ -182,12 +193,30 @@ def process_pose_tracking(video_path):
             results = pose.process(rgb_frame)
             
             if results.pose_landmarks:
-                head = results.pose_landmarks.landmark[0] # Nose/Head
+                landmarks = results.pose_landmarks.landmark
+                head = landmarks[0] # Nose/Head
+
+                # Right Arm (12: shoulder, 14: elbow, 16: wrist)
+                shoulder_r = [landmarks[12].x, landmarks[12].y]
+                elbow_r = [landmarks[14].x, landmarks[14].y]
+                wrist_r = [landmarks[16].x, landmarks[16].y]
+                elbow_angle_r = calculate_angle(shoulder_r, elbow_r, wrist_r)
+
+                # Right Leg (24: hip, 26: knee, 28: ankle)
+                hip_r = [landmarks[24].x, landmarks[24].y]
+                knee_r = [landmarks[26].x, landmarks[26].y]
+                ankle_r = [landmarks[28].x, landmarks[28].y]
+                knee_angle_r = calculate_angle(hip_r, knee_r, ankle_r)
+
                 tracking_data.append({
                     "frame": frame_count,
-                    "timestamp": frame_count / fps,
+                    "timestamp": frame_count / fps if fps > 0 else frame_count / 30.0,
                     "head_x": head.x,
-                    "head_y": head.y
+                    "head_y": head.y,
+                    "elbow_angle": elbow_angle_r,
+                    "knee_angle": knee_angle_r,
+                    "wrist_x": wrist_r[0],
+                    "wrist_y": wrist_r[1]
                 })
         
         frame_count += 1
