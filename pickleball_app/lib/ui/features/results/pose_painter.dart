@@ -15,7 +15,7 @@ class PosePainter extends CustomPainter {
 
     // 1. Draw Player Indicator Arrow
     final arrowPaint = Paint()
-      :color = Colors.red
+      ..color = Colors.red
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()

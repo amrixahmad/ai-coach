@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import '../../../data/models/stroke_analysis.dart';
 import '../../../data/models/tracking_frame.dart';
 import '../../../data/services/api_service.dart';
 import 'pose_painter.dart';
