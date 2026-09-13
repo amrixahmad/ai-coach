@@ -95,7 +95,12 @@ flutter run -d web-server --web-port 8080 --web-hostname localhost
 - **Mobile UI/UX Shell & Profile Dashboard**: Material 3 `NavigationBar` shell ([main_shell.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/ui/shell/main_shell.dart)) hosting 3 tabs (**Coach**, **History**, **Profile**), custom Teal court palette, and a performance stats dashboard ([profile_view.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/ui/features/profile/profile_view.dart)).
 - **Video Preview & Multi-Stage Analysis Progress**: On [home_view.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/ui/features/home/home_view.dart), selecting a clip instantiates an inline video preview with metadata (filename, file size in MB), and clicking analyze triggers a step-by-step 3-stage progress card (*Stage 1: Uploading, Stage 2: Pose Tracking, Stage 3: Gemini AI Analysis*).
 - **Dockerized Container Backend**: Python FastAPI backend has been containerized with OpenCV & MediaPipe system dependencies ([backend/Dockerfile](file:///c:/Users/user/Documents/ai-coach/backend/Dockerfile)) and tested running in Docker (`pickleball-backend-container` listening on `http://localhost:8000`). Ready for Phase 2 GCP Cloud Run / Render deployment.
-- **Railway Cloud Deployment (Phase 2)**: Created and linked Railway project `pickleball-backend` (Region: Southeast Asia). Configured `GEMINI_API_KEY` environment variable and generated public domain `https://pickleball-backend-production-c00e.up.railway.app`.
+- **Railway Cloud Deployment (Phase 2)**: Linked project `pickleball-backend` on Railway (Southeast Asia) with managed PostgreSQL database (`postgres-volume`). 
+- **Production Backend URL**: `https://pickleball-backend-production-c00e.up.railway.app`
+- **Root Dockerfile & Railway Auto-Deploy**: Created root `Dockerfile` and `railway.json` mapping `backend/` files so pushing to `origin main` automatically builds and deploys to Railway cleanly.
+- **Frontend API Config**: Created `ApiConfig` in [api_config.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/data/services/api_config.dart) defaulting to Railway Production API, with `--dart-define=API_URL=...` override for local dev testing.
+- **Robust Gemini Fallback**: Wrapped Gemini API calls in `main.py` with try/except fallback (`get_fallback_analysis`) to guarantee uninterrupted pose tracking analysis even if Gemini API rates or prepayments are temporarily exhausted.
+- **End-to-End Test Verified**: Video uploads process through MediaPipe pose tracking, store relative URLs (`/uploads/dev_user_123/...`), and persist structured coaching records into Railway PostgreSQL database (`GET /analyses` verified returning HTTP 200).
 
 ---
 
