@@ -97,6 +97,8 @@ flutter run -d web-server --web-port 8080 --web-hostname localhost
 - **Dockerized Container Backend**: Python FastAPI backend has been containerized with OpenCV & MediaPipe system dependencies ([backend/Dockerfile](file:///c:/Users/user/Documents/ai-coach/backend/Dockerfile)) and tested running in Docker (`pickleball-backend-container` listening on `http://localhost:8000`). Ready for Phase 2 GCP Cloud Run / Render deployment.
 - **Railway Cloud Deployment (Phase 2)**: Linked project `pickleball-backend` on Railway (Southeast Asia) with managed PostgreSQL database (`postgres-volume`). 
 - **Production Backend URL**: `https://pickleball-backend-production-c00e.up.railway.app`
+- **Production Web App URL (Railway Unified)**: [https://pickleball-backend-production-c00e.up.railway.app/ui](https://pickleball-backend-production-c00e.up.railway.app/ui)
+- **Production Web App URL (Vercel Static)**: [https://temporary-racing-monsoon-v3qounh.vercel.app](https://temporary-racing-monsoon-v3qounh.vercel.app)
 - **Root Dockerfile & Railway Auto-Deploy**: Created root `Dockerfile` and `railway.json` mapping `backend/` files so pushing to `origin main` automatically builds and deploys to Railway cleanly.
 - **Frontend API Config**: Created `ApiConfig` in [api_config.dart](file:///c:/Users/user/Documents/ai-coach/pickleball_app/lib/data/services/api_config.dart) defaulting to Railway Production API, with `--dart-define=API_URL=...` override for local dev testing.
 - **Robust Gemini Fallback**: Wrapped Gemini API calls in `main.py` with try/except fallback (`get_fallback_analysis`) to guarantee uninterrupted pose tracking analysis even if Gemini API rates or prepayments are temporarily exhausted.
