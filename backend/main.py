@@ -43,7 +43,7 @@ from fastapi.responses import FileResponse
 # Serve uploaded videos as static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Serve Flutter Web frontend as static files if built inside container
+# Resolve static web directory if built inside container
 possible_static_paths = [
     Path("static_web"),
     Path("/app/static_web"),
@@ -51,14 +51,6 @@ possible_static_paths = [
 ]
 STATIC_WEB_DIR = next((p for p in possible_static_paths if p.exists()), None)
 print(f"Startup CWD: {os.getcwd()}, STATIC_WEB_DIR resolved to: {STATIC_WEB_DIR}")
-
-if STATIC_WEB_DIR:
-    app.mount("/web", StaticFiles(directory=str(STATIC_WEB_DIR), html=True), name="static_web")
-
-    @app.get("/ui", include_in_schema=False)
-    @app.get("/web", include_in_schema=False)
-    def serve_web_index():
-        return FileResponse(STATIC_WEB_DIR / "index.html")
 
 # Configure Gemini Client
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -370,4 +362,20 @@ def delete_analysis(
     db.delete(record)
     db.commit()
     return {"message": "Deleted successfully"}
+
+# Root SPA Catch-All for Flutter Web frontend
+if STATIC_WEB_DIR:
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_or_static(full_path: str):
+        if full_path.startswith("api/") or full_path.startswith("auth/") or full_path.startswith("process-video") or full_path.startswith("analyses") or full_path.startswith("uploads/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        target_file = STATIC_WEB_DIR / full_path
+        if full_path and target_file.exists() and target_file.is_file():
+            return FileResponse(target_file)
+        
+        index_file = STATIC_WEB_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Web app not found")
 
