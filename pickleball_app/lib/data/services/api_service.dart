@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../models/stroke_analysis.dart';
 import '../models/tracking_frame.dart';
 
@@ -19,9 +20,9 @@ class AnalysisResult {
 class ApiService {
   final String baseUrl;
 
-  ApiService({this.baseUrl = 'http://10.0.2.2:8000'}); // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
+  ApiService({this.baseUrl = 'http://localhost:8000'});
 
-  Future<AnalysisResult> processVideo(File videoFile, {String? authToken}) async {
+  Future<AnalysisResult> processVideo(XFile videoFile, {String? authToken}) async {
     final uri = Uri.parse('$baseUrl/process-video');
     final request = http.MultipartRequest('POST', uri);
 
@@ -29,8 +30,18 @@ class ApiService {
       request.headers['Authorization'] = 'Bearer $authToken';
     }
 
-    final multipartFile = await http.MultipartFile.fromPath('file', videoFile.path);
-    request.files.add(multipartFile);
+    if (kIsWeb) {
+      final bytes = await videoFile.readAsBytes();
+      final multipartFile = http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: videoFile.name.isNotEmpty ? videoFile.name : 'upload.mp4',
+      );
+      request.files.add(multipartFile);
+    } else {
+      final multipartFile = await http.MultipartFile.fromPath('file', videoFile.path);
+      request.files.add(multipartFile);
+    }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);

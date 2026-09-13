@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../data/services/api_service.dart';
@@ -13,7 +12,7 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  File? _selectedVideo;
+  XFile? _selectedVideo;
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
   final ApiService _apiService = ApiService();
@@ -22,7 +21,7 @@ class _HomeViewState extends State<HomeView> {
     final XFile? file = await _picker.pickVideo(source: ImageSource.gallery);
     if (file != null) {
       setState(() {
-        _selectedVideo = File(file.path);
+        _selectedVideo = file;
       });
     }
   }
@@ -48,7 +47,7 @@ class _HomeViewState extends State<HomeView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: ${e.toString()}')),
+          SnackBar(content: Text('Upload failed: ${e.toString().replaceAll("Exception: ", "")}')),
         );
       }
     } finally {

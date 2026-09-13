@@ -1,12 +1,14 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../../../data/models/tracking_frame.dart';
 import '../../../data/services/api_service.dart';
 import 'pose_painter.dart';
 
 class ResultsView extends StatefulWidget {
-  final File videoFile;
+  final XFile videoFile;
   final AnalysisResult analysisResult;
 
   const ResultsView({
@@ -26,12 +28,20 @@ class _ResultsViewState extends State<ResultsView> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.file(widget.videoFile)
-      ..initialize().then((_) {
+    if (kIsWeb) {
+      final url = widget.analysisResult.videoUrl ?? widget.videoFile.path;
+      _controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    } else {
+      _controller = VideoPlayerController.file(File(widget.videoFile.path));
+    }
+
+    _controller.initialize().then((_) {
+      if (mounted) {
         setState(() {});
         _controller.play();
         _controller.setLooping(true);
-      });
+      }
+    });
 
     _controller.addListener(_onVideoTick);
   }
