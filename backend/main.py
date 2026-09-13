@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from database import init_db, get_db, User, Analysis
 from auth import hash_password, verify_password, create_access_token, get_current_user
+from storage import upload_file_to_r2
 
 load_dotenv()
 
@@ -306,8 +307,10 @@ async def process_video(
         # 2. Get Motion Tracking
         tracking_result, fps, width, height = process_pose_tracking(file_path)
         
-        # 3. Save to database & serve via static files relative URL
-        video_url = f"/uploads/{user.id}/{saved_filename}"
+        # 3. Upload to Cloudflare R2 Object Storage (if configured) or fallback to local static URL
+        object_key = f"{user.id}/{saved_filename}"
+        r2_url = upload_file_to_r2(file_path, object_key)
+        video_url = r2_url if r2_url else f"/uploads/{user.id}/{saved_filename}"
         
         analysis_record = Analysis(
             user_id=user.id,
