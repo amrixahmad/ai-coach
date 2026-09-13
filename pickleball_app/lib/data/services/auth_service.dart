@@ -49,11 +49,6 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) print('Failed to load session: $e');
     } finally {
-      // Dev Auto-Login Bypass: Auto-authenticate as Dev User for testing
-      if (_accessToken == null || _accessToken!.isEmpty) {
-        _accessToken = 'dev_token';
-        _user = UserProfile(id: 'dev_user_123', email: 'dev@example.com');
-      }
       _isInitialized = true;
       notifyListeners();
     }
@@ -109,8 +104,8 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    _accessToken = 'dev_token';
-    _user = UserProfile(id: 'dev_user_123', email: 'dev@example.com');
+    _accessToken = null;
+    _user = null;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
